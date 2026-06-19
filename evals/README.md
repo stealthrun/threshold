@@ -48,7 +48,7 @@ Each carries a `must_address` list (what a good read has to engage) and a `must_
 
 ## Roadmap
 
-- [x] Voice guard — runnable today (`python ../coach_voice.py`).
+- [x] Voice guard — runnable today (`python3 ../coach_voice.py`).
 - [x] Golden-session design + rubric.
 - [ ] `golden_sessions.py` — the eight scenarios as runnable fixtures *(Phase 3)*.
 - [ ] `judge.py` + `run.py` — wire the judge to the live generator *(Phase 3)*.

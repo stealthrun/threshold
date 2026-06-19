@@ -17,7 +17,7 @@ trigger: generate, scan, regenerate if dirty.
 
 Run me:
 
-    python coach_voice.py
+    python3 coach_voice.py
 """
 
 import re

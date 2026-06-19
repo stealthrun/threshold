@@ -1,100 +1,80 @@
 # threshold
 
-**Most training tools describe your data. `threshold` interprets it.**
+I train mostly solo, and every running app I've used does the same thing: it hands me
+charts, splits, and a zone pie-graph, then leaves me to figure out what any of it actually
+*meant*. A coach never does that. They look at the same numbers and tell you what your
+body did, why, and what to do next.
 
-An eval-backed, agent-native coaching engine. Give it a training session and it reads
-that session the way a coach does — not an analyst. It tells you what the session *meant
-for your body* and what to do next, instead of reciting heart-rate zones and percentages
-back at you.
+So I built that. **`threshold` reads a training session the way a coach does — not an
+analyst.** It's an LLM coaching engine packaged as a
+[Claude Agent Skill](skills/coaching-interpretation/), built on my own running data.
 
-It's packaged as a [Claude Agent Skill](skills/coaching-interpretation/), and it's built
-on a real, personal dataset: my own running. The interesting part isn't the running —
-it's the engineering discipline around making an LLM coach *reliably*.
+The running is just the domain. The real point of this repo is the harder problem
+underneath it: **how do you ship an LLM feature you can actually trust?**
 
----
+## What's in here right now
 
-## The one insight
+This is the public, distilled core of a larger private system (`srlOS`, where the full
+FIT-file pipeline lives). I'm building it out in the open, one phase at a time:
 
-Every endurance tool on the market shows you the same thing: charts, splits, zone
-pie-graphs. None of them tell you what a session actually *meant*. The gap was never
-data — it's interpretation. A coach doesn't read you your numbers; they read what the
-numbers imply about your body, in the context of your last six weeks. `threshold` is an
-attempt to encode that read.
+- ✅ **Voice guard** — runs today: `python3 coach_voice.py` (no dependencies)
+- ✅ **Design notes + eval methodology** — [`docs/DESIGN.md`](docs/DESIGN.md)
+- 🚧 **The skill** (interpretation prompt + signal derivation) — Phase 2
+- 🚧 **The eval harness**, wired end-to-end — Phase 3
 
-## What's interesting here (for engineers)
+Nothing here claims to do more than those checkboxes. That's deliberate.
 
-This is a study in shipping an LLM feature you can *trust* — not a chatbot demo.
+## The interesting part (for engineers)
 
-### 1. Evals before prompts
-Before touching a single prompt, the hard cases are frozen as **golden sessions**: eight
-scenarios that each isolate one coaching read — a VO2 set where the pace faded but the
-heart never maxed, an easy run that drifted into tempo, fatigue hiding under on-target
-splits. Each golden carries a `must_address` list (what a good read has to engage) and a
-`must_not` list (what it must never do — e.g. *manufacture concern a clean session
-doesn't warrant*). Every prompt change after that is a **measured delta against the
-goldens, not a vibe.** → [`evals/`](evals/)
+Four ideas do most of the work. None of them are "call the API and hope."
 
-### 2. A two-layer gate: deterministic + judge
-- **Voice guard** — a free, instant regex that scans the model's *output* for leaked
-  zone codes, percentages, internal scores, and analyst jargon. The half a prompt can't
-  guarantee. Runnable today. → [`coach_voice.py`](coach_voice.py)
-- **LLM judge** — a separate model call grading whether the brief actually *coached*: did
-  it engage the core signal, read as a coach not an analyst, ground its claims in the
-  data, and end on a concrete action.
+**Evals before prompts.** LLM features fail quietly: they read fine until you tweak a
+prompt and something silently regresses. So before writing the prompt I wanted to ship, I
+froze the hard cases — eight **golden sessions**, each isolating one read (pace faded but
+the heart never maxed; an easy run that crept into tempo; fatigue hiding under on-target
+splits). Each one spells out what a good read *must* say and what it must *never* say.
+After that, every prompt change is a measured delta, not a vibe. → [`evals/`](evals/)
 
-A golden passes only if the guard is clean **and** the judge passes every criterion. The
-gate is deliberately hard to please.
+**Never let the model say the number.** The one rule every prompt obeys: translate the
+signal, don't quote it. "You spent 38% in Z5, pacing consistency 0.78" isn't coaching,
+it's a data dump — and it's what most tools produce. The forbidden vocabulary is enforced
+twice: in the prompt, and by a regex on the model's *output*
+([`coach_voice.py`](coach_voice.py)), in one file so the rule and its checker can't drift
+apart. A prompt can *ask* for clean prose; this *proves* it.
 
-### 3. Deterministic where it should be, LLM where it has to be
-The signals (`stimulus_quality`, `vs_plan`, `key_signal`) are derived in plain, testable
-Python — verifiable and free. The LLM only does the part that genuinely needs judgment:
-turning those signals into a coach's read. Knowing which half is which is most of the job.
+**Use the model only where you have to.** Whether a session hit its target, whether it was
+quality, the one-line summary of what happened — that's plain Python. Testable, free,
+deterministic. The model only does the irreducibly fuzzy part: turning those signals into
+a coach's read. Keep the surface where it can hallucinate small.
 
-### 4. One tooled engine, not a multi-agent panel
-The coach is a single engine holding the athlete's context — not a swarm of role-played
-"specialist agents." That restraint is a design decision: the simpler correct
-architecture beats the impressive-looking one.
+**One engine, not a committee of agents.** It's tempting to build a "panel" — a fatigue
+agent, a pacing agent, a coordinator — because it demos well. I didn't. One engine holding
+the full context gives a more coherent read and is far easier to evaluate. The boring
+architecture was the right one.
 
----
+## Describe vs. interpret
 
-## The voice contract (a concrete example)
+Same session, two ways of talking about it:
 
-The single rule every prompt obeys: **translate the signal, never quote the number.**
+> **Analyst** (most tools): "Z5 time 38%, pacing consistency 0.78, decoupling in rep 4 —
+> classic VO2 fade."
 
-> **Analyst (what most tools produce):**
-> "Z5 time was 38%, pacing consistency 0.78, clear decoupling in rep 4 — classic VO2 fade."
+> **Coach** (`threshold`): "Your legs hit their limit before your heart did. The pace bled
+> away while your effort stayed under the ceiling, so the cardiovascular stimulus was
+> diminished, not a bad day. Next time, drop a rep and hold the pace."
 
-> **Coach (what `threshold` produces):**
-> "Your legs hit their limit before your heart did. The pace bled away while your effort
-> stayed under the ceiling, so the cardiovascular stimulus was diminished, not a bad day.
-> Next time drop a rep and hold the pace."
+Both are true. Only one tells you what happened and what to do. Full walk-through in
+[`examples/faded_vo2.md`](examples/faded_vo2.md).
 
-The forbidden vocabulary is enforced both in the prompt (`VOICE_GUARDRAILS`) and on the
-output (`voice_violations`) — in one module, so the rule and its checker can't drift.
-
-## Run the part that runs today
-
-No dependencies. Pure standard library.
+## Run the part that runs
 
 ```bash
-python coach_voice.py
+python3 coach_voice.py
 ```
 
-It scans a deliberately "dirty" analyst brief and a clean coach brief, and prints exactly
-which rule each one trips.
-
-## Status
-
-Assembled in the open as a portfolio piece. Honest state:
-
-- [x] Voice contract + deterministic voice guard — **runnable**
-- [x] Golden-session methodology + eval design — see [`evals/`](evals/)
-- [x] A worked before/after example — see [`examples/`](examples/)
-- [ ] Skill packaging (`SKILL.md` prompt + helper scripts) — *Phase 2*
-- [ ] Eval harness wired to the live generator (judge + runner) — *Phase 3*
-
-The full reasoning engine and its FIT-file data pipeline live in a separate private lab
-(`srlOS`). This repo is the distilled, legible core — the parts worth reading.
+Scans a deliberately messy analyst brief and a clean coach brief, and prints exactly which
+rule each one trips. No install, standard library only.
 
 ## License
+
 MIT — see [LICENSE](LICENSE).

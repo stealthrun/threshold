@@ -4,6 +4,9 @@ The decisions behind `threshold`, written for someone evaluating how I think abo
 building with LLMs. Each section is a hypothesis about what an AI coaching agent
 actually needs — and why the obvious approach is usually wrong.
 
+_This documents the system's design as a whole. Pieces that currently live in the private
+lab and are still being ported into this public repo are marked 🚧._
+
 ## 1. Interpret, don't describe
 
 The thesis the whole project tests: the value isn't the data, it's the read.
@@ -52,7 +55,8 @@ Quality here has two independent failure surfaces, so it gets two independent ch
 It's free, instant, and it's the half a prompt fundamentally cannot guarantee: a prompt
 can *ask* for clean prose; it cannot *prove* the prose is clean.
 
-**Layer 2 — the LLM judge.** A separate model call grading the part a regex can't see:
+**Layer 2 — the LLM judge.** _(🚧 lives in the private lab today; ported into this repo in
+Phase 3.)_ A separate model call grading the part a regex can't see:
 did the brief engage this scenario's core signal, read as a coach and not an analyst,
 ground its claims in the data, end on a concrete action — and *not* manufacture concern.
 Per-criterion pass/fail plus an overall 1–5.
