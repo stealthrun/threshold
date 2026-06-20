@@ -52,7 +52,19 @@ Each carries a `must_address` list (what a good read has to engage) and a `must_
 - [x] Golden-session design + rubric.
 - [x] `golden_sessions.py` — the eight scenarios as runnable fixtures, each pinned to the
       signal it isolates (`python3 ../evals/golden_sessions.py`).
-- [ ] `judge.py` + `run.py` — wire the judge to the live generator *(Phase 3)*.
+- [x] `judge.py` + `run.py` — the LLM judge and the runner, wired to the live generator.
 
 The generator these score is [`interpret.py`](../interpret.py) — the same code path the
 skill runs, so what's measured here is what ships.
+
+## Running it
+
+    python3 -m evals.run                   # all goldens, voice guard + judge
+    python3 -m evals.run --no-judge        # deterministic guard only (fast, free)
+    python3 -m evals.run --only faded_vo2  # one scenario
+    python3 -m evals.run --full            # print the full read text
+
+Each read is a real `claude` call (plus one judge call), so a full run takes a moment. A
+golden **passes** only if the voice guard is clean **and** the judge passes every criterion
+with overall ≥ 4. The process exits non-zero if any golden fails the gate, so it drops
+into CI. Each run is saved to `results/<timestamp>.json` (gitignored) for cross-run diffing.

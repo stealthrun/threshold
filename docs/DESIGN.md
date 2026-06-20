@@ -55,11 +55,12 @@ Quality here has two independent failure surfaces, so it gets two independent ch
 It's free, instant, and it's the half a prompt fundamentally cannot guarantee: a prompt
 can *ask* for clean prose; it cannot *prove* the prose is clean.
 
-**Layer 2 — the LLM judge.** _(🚧 lives in the private lab today; ported into this repo in
-Phase 3.)_ A separate model call grading the part a regex can't see:
-did the brief engage this scenario's core signal, read as a coach and not an analyst,
-ground its claims in the data, end on a concrete action — and *not* manufacture concern.
-Per-criterion pass/fail plus an overall 1–5.
+**Layer 2 — the LLM judge** ([`evals/judge.py`](../evals/judge.py)). A separate model
+call grading the part a regex can't see: did the brief engage this scenario's core signal,
+read as a coach and not an analyst, ground its claims in the data, end on a concrete
+action — and *not* manufacture concern. Per-criterion pass/fail plus an overall 1–5. Its
+five criteria are kept parallel to the generation prompt's five jobs, so a failure points
+back at the instruction that slipped.
 
 A golden passes only if the guard is clean **and** the judge passes every criterion. Hard
 to please on purpose.
