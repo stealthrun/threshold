@@ -45,7 +45,7 @@ def _tick(ok: bool) -> str:
 
 def evaluate_one(golden: dict, use_judge: bool) -> dict:
     """Generate + score one golden. Returns a result row (also the saved-JSON shape)."""
-    brief = interpret(golden["session"], golden.get("recent_weeks"))
+    brief = interpret(golden["session"], golden.get("recent_weeks"), golden.get("block"))
     if not brief:
         return {"name": golden["name"], "error": "no read (claude unavailable or empty)"}
 

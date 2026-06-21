@@ -26,6 +26,9 @@ A session bundle (the shape the engine assembles at runtime):
 - **`feedback`** — how it felt: RPE, legs vs breath, Achilles flag, free-text notes.
 - **`plan_target`** — what was prescribed, so the read is *against the plan*, not abstract.
 - **`recent_weeks`** — the trailing context that turns a number into a trend.
+- **`block`** — where the session sits in the plan (phase: base / build / sharpening /
+  taper, and how far through). Human-curated, and the deepest context tier: the same
+  under-target effort is expected fatigue in a build but a flag in a taper.
 
 ## Output contract
 

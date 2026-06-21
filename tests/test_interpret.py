@@ -65,6 +65,39 @@ def test_unplanned_session_renders_without_a_plan_block():
     assert "unplanned session" in interpret.build_prompt(s, RECENT)
 
 
+# ── block context ─────────────────────────────────────────────────────────────────────
+
+BLOCK = {"name": "competition", "phase": "taper", "week": 2, "total_weeks": 2,
+         "focus": "shedding fatigue for the goal race"}
+
+
+def test_prompt_includes_block_context():
+    prompt = interpret.build_prompt(SESSION, RECENT, BLOCK)
+    assert "BLOCK (where this sits in the plan):" in prompt
+    assert "competition, taper phase (week 2 of 2)" in prompt
+    assert "shedding fatigue for the goal race" in prompt
+
+
+def test_prompt_renders_gracefully_without_a_block():
+    # block is optional; its absence must not break assembly and must be explicit
+    prompt = interpret.build_prompt(SESSION, RECENT)
+    assert "BLOCK (where this sits in the plan):" in prompt
+    assert "none provided" in prompt
+
+
+def test_block_with_partial_fields():
+    prompt = interpret.build_prompt(SESSION, RECENT, {"name": "base build", "week": 6})
+    assert "base build (week 6)" in prompt
+
+
+def test_same_session_different_block_changes_the_prompt():
+    # the whole point of block context: identical session, different prompt to the model
+    build = {"name": "base build", "phase": "build", "week": 6, "total_weeks": 8}
+    taper = {"name": "competition", "phase": "taper", "week": 2, "total_weeks": 2}
+    assert interpret.build_prompt(SESSION, RECENT, build) != \
+        interpret.build_prompt(SESSION, RECENT, taper)
+
+
 # ── formatting helpers ────────────────────────────────────────────────────────────────
 
 def test_fmt_pace():

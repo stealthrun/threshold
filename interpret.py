@@ -73,9 +73,13 @@ _SYSTEM = (
     "outcome.\n"
     "3. The gap between how it FELT and what the body actually did, integrated into the "
     "read rather than listed.\n"
-    "4. What the recent weeks mean for readiness right now — the trend, not the totals.\n"
+    "4. What it means given WHERE THE ATHLETE IS in the block and the recent weeks — the "
+    "same session reads differently in a base or build phase than in a sharpening or taper "
+    "phase (an under-target effort deep in a heavy build is expected fatigue; the same miss "
+    "in a taper is a flag). Judge readiness against the block's intent and the trend, not "
+    "the raw totals.\n"
     "5. End on the ONE thing to carry forward and a concrete action for the next 48 "
-    "hours.\n\n"
+    "hours, consistent with what the block is trying to achieve right now.\n\n"
     "Be honest and specific. If the session was good and the body is fine, say so plainly "
     "and do not manufacture concern. No greeting, no headers, no lists. Do not restate "
     "raw distance or duration the athlete already knows. Output ONLY the read."
@@ -145,9 +149,35 @@ def _fmt_recent_weeks(recent_weeks: list[dict] | None) -> list[str]:
     return out
 
 
-# ── Context assembly: the session facts + signals + feel + recent weeks ────────────────
+def _fmt_block(block: dict | None) -> list[str]:
+    """The periodization context — the deepest tier. Human-curated (intent, not
+    measurable from activity data), so it's an explicit input. Where the athlete is in
+    the plan is what flips an identical session between expected fatigue and a flag."""
+    if not block:
+        return ["  none provided (read the session on its own merits)"]
+    name = block.get("name", "current block")
+    phase = block.get("phase")
+    week, total = block.get("week"), block.get("total_weeks")
+    head = name
+    if phase:
+        head += f", {phase} phase"
+    if week and total:
+        head += f" (week {week} of {total})"
+    elif week:
+        head += f" (week {week})"
+    out = [f"  {head}"]
+    if block.get("focus"):
+        out.append(f"  focus: {block['focus']}")
+    return out
 
-def build_context(session: dict, recent_weeks: list[dict] | None = None) -> str:
+
+# ── Context assembly: the session facts + signals + feel + block + recent weeks ────────
+
+def build_context(
+    session: dict,
+    recent_weeks: list[dict] | None = None,
+    block: dict | None = None,
+) -> str:
     """Render one session (and its derived signals) into the prompt's data block."""
     signals = derive_signals(session)
     fb = session.get("feedback") or {}
@@ -182,20 +212,27 @@ def build_context(session: dict, recent_weeks: list[dict] | None = None) -> str:
         f"{fb.get('rpe_breath', fb.get('rpe_lungs', 'n/a'))}/10",
         f"  Achilles niggle: {'YES' if fb.get('achilles_flag') else 'no'}",
         "",
+        "BLOCK (where this sits in the plan):",
+        *_fmt_block(block),
+        "",
         "RECENT WEEKS (newest first):",
         *_fmt_recent_weeks(recent_weeks),
     ]
     return "\n".join(lines)
 
 
-def build_prompt(session: dict, recent_weeks: list[dict] | None = None) -> str:
+def build_prompt(
+    session: dict,
+    recent_weeks: list[dict] | None = None,
+    block: dict | None = None,
+) -> str:
     """Assemble the full prompt in ONE place: role + framework + voice + data. This is
     the single composition site the design depends on; the unit test pins its contents."""
     return (
         f"{_SYSTEM}\n\n"
         f"COACHING FRAMEWORK:\n{_load_framework()}\n\n"
         f"{VOICE_GUARDRAILS}\n\n"
-        f"{build_context(session, recent_weeks)}"
+        f"{build_context(session, recent_weeks, block)}"
     )
 
 
@@ -244,13 +281,14 @@ def _correction(violations: list[tuple[str, str]]) -> str:
 def interpret(
     session: dict,
     recent_weeks: list[dict] | None = None,
+    block: dict | None = None,
     timeout: int = 120,
 ) -> str | None:
     """Turn one session into the coach's read: derive signals, assemble the prompt, call
     the model, then voice-check the output and regenerate ONCE if it leaks. Returns the
     clean read, the best attempt if the leak survives the retry, or None if the model is
     unavailable."""
-    prompt = build_prompt(session, recent_weeks)
+    prompt = build_prompt(session, recent_weeks, block)
 
     brief = call_claude(prompt, timeout=timeout)
     if not brief:
@@ -264,47 +302,44 @@ def interpret(
     return retry or brief
 
 
-# ── demo: run the engine on two goldens and gate the output ───────────────────────────
+# ── demo: the same session, read against two different blocks ──────────────────────────
+#
+# This is the point of block context. ONE under-target threshold session (paces came in
+# slow, the body honestly fatigued) is handed to the engine twice — once deep in a heavy
+# build, once in race week. A context-blind engine writes the same read both times. A coach
+# reads them oppositely: expected cost of the build vs. a genuine flag before a race.
 
 if __name__ == "__main__":
-    faded_vo2 = {
-        "activity_type": "vo2",
-        "distance_km": 9.5, "avg_pace_sec_per_km": 230, "avg_hr": 170, "max_hr": 178,
-        "zone_dist": {"Z2": 0.1, "Z3": 0.2, "Z4": 0.3, "Z5": 0.4},
-        "flags": ["pace_fade"],
-        "laps": [
-            {"lap_type": "work", "distance_m": 800, "duration_sec": p * 800 // 1000,
-             "avg_hr": h, "avg_pace_sec_per_km": p}
-            for p, h in zip([184, 187, 192, 199, 205, 205], [172, 175, 176, 177, 177, 178])
-        ],
-        "feedback": {"rpe_breath": 7, "rpe_legs": 9, "achilles_flag": False,
-                     "feel": "legs cooked by rep 4, lungs still had room"},
-        "plan_targets": {"work_rep_count": 6, "work_pace_target_sec_km": 185},
-    }
-    clean_threshold = {
+    under_target_threshold = {
         "activity_type": "threshold",
-        "distance_km": 12.0, "avg_pace_sec_per_km": 244, "avg_hr": 162, "max_hr": 175,
-        "zone_dist": {"Z2": 0.15, "Z3": 0.45, "Z4": 0.4},
+        "distance_km": 12.0, "avg_pace_sec_per_km": 255, "avg_hr": 163, "max_hr": 174,
+        "zone_dist": {"Z3": 0.6, "Z4": 0.4},
         "laps": [
             {"lap_type": "work", "distance_m": 2000, "duration_sec": p * 2,
              "avg_hr": h, "avg_pace_sec_per_km": p}
-            for p, h in zip([238, 239, 238, 240], [160, 163, 164, 166])
+            for p, h in zip([248, 250, 251, 253], [160, 162, 163, 164])
         ],
-        "feedback": {"rpe_breath": 7, "rpe_legs": 6, "achilles_flag": False,
-                     "feel": "controlled, smooth all the way through"},
+        "feedback": {"rpe_breath": 7, "rpe_legs": 8, "achilles_flag": False,
+                     "feel": "felt heavy, just couldn't find the pace today"},
         "plan_targets": {"work_rep_count": 4, "work_pace_target_sec_km": 240},
     }
     recent_weeks = [
-        {"label": "this week", "volume_km": 78, "sessions": 6,
-         "read": "Right at the top of your tolerance; legs heavy by midweek."},
-        {"label": "week -1", "volume_km": 82, "sessions": 6,
-         "read": "Biggest week of the block, absorbed it well."},
-        {"label": "week -2", "volume_km": 70, "sessions": 5, "read": "Steady build."},
+        {"label": "this week", "volume_km": 84, "sessions": 7, "read": "Top of your range."},
+        {"label": "week -1", "volume_km": 81, "sessions": 6, "read": "Heavy week."},
     ]
+    build_block = {
+        "name": "base build", "phase": "build", "week": 6, "total_weeks": 8,
+        "focus": "raising weekly volume and aerobic durability; quality is secondary",
+    }
+    taper_block = {
+        "name": "competition", "phase": "taper", "week": 2, "total_weeks": 2,
+        "focus": "shedding fatigue and sharpening for the goal race this weekend",
+    }
 
-    for name, session in (("faded_vo2", faded_vo2), ("clean_threshold", clean_threshold)):
-        print(f"\n{'=' * 72}\n[{name}]\n{'=' * 72}")
-        brief = interpret(session, recent_weeks)
+    for label, block in (("BUILD phase, week 6 of 8", build_block),
+                         ("TAPER, race week", taper_block)):
+        print(f"\n{'=' * 72}\n[same under-target threshold] {label}\n{'=' * 72}")
+        brief = interpret(under_target_threshold, recent_weeks, block)
         if not brief:
             print("  (no read — claude CLI unavailable)")
             continue
