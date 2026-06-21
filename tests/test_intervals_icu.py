@@ -147,3 +147,25 @@ def test_get_raises_intervals_error_on_http(monkeypatch):
     monkeypatch.setattr(icu.urllib.request, "urlopen", boom)
     with pytest.raises(icu.IntervalsError, match="401"):
         icu._get("/x", {}, icu.Credentials("i1", "k"))
+
+
+def test_get_sends_real_useragent_and_verifying_context(monkeypatch):
+    """Guard the two edge fixes: intervals.icu's Cloudflare blocks the default urllib
+    User-Agent (error 1010), and the python.org macOS Python has no CA store. Without a real
+    UA and certifi's bundle every fetch fails before auth is even checked."""
+    captured = {}
+
+    class FakeResp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self, *a): return b'{"ok": true}'
+
+    def fake_urlopen(req, timeout=None, context=None):
+        captured["req"], captured["context"] = req, context
+        return FakeResp()
+
+    monkeypatch.setattr(icu.urllib.request, "urlopen", fake_urlopen)
+    assert icu._get("/x", {}, icu.Credentials("i1", "k")) == {"ok": True}
+    assert captured["req"].get_header("User-agent") == icu._USER_AGENT
+    assert "python-urllib" not in captured["req"].get_header("User-agent").lower()
+    assert captured["context"] is icu._SSL_CONTEXT          # verifying, certifi-backed

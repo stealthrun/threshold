@@ -36,6 +36,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -43,6 +44,25 @@ from datetime import date, timedelta
 from typing import NamedTuple
 
 BASE_URL = "https://intervals.icu/api/v1"
+
+# A real User-Agent: intervals.icu's Cloudflare edge rejects the default urllib agent.
+_USER_AGENT = "threshold/0.1 (+https://github.com/stealthrun/threshold)"
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """A verifying TLS context that actually works on a stock install. Some Pythons (notably
+    the python.org macOS build) ship with no CA trust store wired up, so the default context
+    fails every HTTPS call with CERTIFICATE_VERIFY_FAILED. `certifi` carries Mozilla's CA
+    bundle and is present in virtually any Python that has pip, so we use it when available
+    and fall back to the default otherwise — no hard dependency, still verifying."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+_SSL_CONTEXT = _ssl_context()
 
 # intervals.icu activity `type` values that are runs (the only modality this engine reads).
 RUN_TYPES = frozenset({"Run", "VirtualRun", "TrailRun"})
@@ -87,10 +107,18 @@ def _get(path: str, params: dict, creds: Credentials, timeout: int = 30):
     HTTP or network failure, with the API key kept out of the message."""
     url = f"{BASE_URL}{path}?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(
-        url, headers={"Authorization": creds._auth_header(), "Accept": "application/json"}
+        url,
+        headers={
+            "Authorization": creds._auth_header(),
+            "Accept": "application/json",
+            # intervals.icu is behind Cloudflare, which blocks the default
+            # "Python-urllib/x.y" agent as a bot (Cloudflare error 1010). A normal
+            # User-Agent gets the request past the edge so auth can actually be evaluated.
+            "User-Agent": _USER_AGENT,
+        },
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CONTEXT) as resp:
             return json.load(resp)
     except urllib.error.HTTPError as e:
         hint = " (check the API key and athlete id)" if e.code in (401, 403) else ""

@@ -104,6 +104,8 @@ def _build_arg_parser():
                                     "~/.config/threshold/config.toml)")
     p.add_argument("--vault", help="path to the Obsidian vault (overrides the config file)")
     p.add_argument("--weeks", type=int, default=4, help="weeks of context to fetch (default 4)")
+    p.add_argument("--list", action="store_true",
+                   help="just fetch and print recent runs — no read, no vault write, no model")
     sel = p.add_mutually_exclusive_group()
     sel.add_argument("--activity", help="intervals.icu activity id to read (e.g. i123)")
     sel.add_argument("--date", help="read the run on this date (YYYY-MM-DD)")
@@ -126,6 +128,37 @@ def _resolve_block(args, config: dict) -> dict | None:
     return block or None
 
 
+def _fmt_pace(sec_per_km) -> str:
+    if not sec_per_km:
+        return "  --  "
+    m, s = divmod(int(sec_per_km), 60)
+    return f"{m}:{s:02d}/km"
+
+
+def list_recent(creds: Credentials, weeks: int) -> int:
+    """Fetch and print recent runs (with plan match + week totals). The cheap, deterministic
+    'what did I do lately?' — no model call, no vault write."""
+    sessions, summaries = fetch_recent_with_plan(creds, weeks=weeks)
+    if not sessions:
+        print(f"  No runs found in the last {weeks} week(s).")
+        return 0
+    print(f"  {len(sessions)} run(s) in the last {weeks} week(s):\n")
+    for s in sessions:
+        plan = "· planned" if s.get("plan_targets") else ""
+        print(f"  {s.get('date')}  {str(s.get('activity_type') or '?'):9} "
+              f"{str(s.get('distance_km') or '?'):>6}km  {_fmt_pace(s.get('avg_pace_sec_per_km'))}"
+              f"  {s.get('source_id') or '':8} {plan}")
+    print()
+    for w in summaries:
+        bits = [w.get("label", "week")]
+        if w.get("volume_km") is not None:
+            bits.append(f"{w['volume_km']}km")
+        if w.get("sessions") is not None:
+            bits.append(f"{w['sessions']} runs")
+        print("  " + ", ".join(bits))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
 
@@ -135,6 +168,13 @@ def main(argv: list[str] | None = None) -> int:
     except IntervalsError as exc:
         print(f"  {exc}")
         return 2
+
+    if args.list:
+        try:
+            return list_recent(creds, weeks=args.weeks)
+        except IntervalsError as exc:
+            print(f"  fetch failed: {exc}")
+            return 1
 
     vault = args.vault or config.get("vault")
     if not vault:

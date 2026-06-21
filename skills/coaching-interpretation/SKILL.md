@@ -19,7 +19,11 @@ Obsidian vault, so coaching compounds over time.
 
 ## Prerequisites
 
-- **Python 3** (standard library only — nothing to `pip install`).
+- **Python 3** (standard library — no required packages). It uses `certifi` for TLS *if
+  present*, which matters on the python.org macOS build whose default install has no CA
+  store; `certifi` ships with pip and is almost always already there. If HTTPS fails with a
+  certificate error, run `pip install certifi` (or that Python's "Install Certificates"
+  command).
 - **The `claude` CLI** on `PATH` — the read is generated through it. Any Claude Code user
   already has it.
 - **Config** — credentials + vault path, read from `~/.config/threshold/config.toml`
@@ -36,13 +40,20 @@ Obsidian vault, so coaching compounds over time.
 
 ## How to run it
 
-All paths are relative to this skill's folder; the entry point is
-[`scripts/coach.py`](scripts/coach.py). With the config file in place it needs no arguments:
+**This is a deterministic CLI. Map the athlete's request to one `coach.py` invocation and
+run it — don't fetch, parse, or reason about the data yourself.** The script does the work;
+your job is to pick the command and relay its output.
 
-    python3 scripts/coach.py                       # most recent run, vault from config
-    python3 scripts/coach.py --activity i123       # a specific activity
-    python3 scripts/coach.py --date 2026-06-18
-    python3 scripts/coach.py --vault ~/other-vault # override the configured vault
+| The athlete asks… | Run |
+|---|---|
+| "what did I do this week?" / "show my runs" | `python3 scripts/coach.py --list` |
+| "how did my last run go?" | `python3 scripts/coach.py` |
+| "read my run from Tuesday / the 18th" | `python3 scripts/coach.py --date 2026-06-18` |
+| "how was *that* session" (you have an id) | `python3 scripts/coach.py --activity i123` |
+
+`--list` is cheap (fetch + print only, no model call, no vault write) — use it to find the
+activity id, then read a specific one with `--activity`. All paths are relative to this
+skill's folder; with the config file in place the entry point needs no other arguments.
 
 **Pass the block when the athlete tells you about it.** The training block is the deepest
 context tier and the one thing that can't be fetched — it's human-curated intent (what the
