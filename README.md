@@ -17,10 +17,13 @@ underneath it: **how do you ship an LLM feature you can actually trust?**
 This is the public, distilled core of a larger private system (`srlOS`, where the full
 FIT-file pipeline lives). I'm building it out in the open, one phase at a time:
 
-- ✅ **Voice guard** — runs today: `python3 coach_voice.py` (no dependencies)
+- ✅ **Voice guard** — `python3 skills/coaching-interpretation/scripts/coach_voice.py`
+  (no dependencies)
 - ✅ **Design notes + eval methodology** — [`docs/DESIGN.md`](docs/DESIGN.md)
-- 🚧 **The skill** (interpretation prompt + signal derivation) — Phase 2
-- 🚧 **The eval harness**, wired end-to-end — Phase 3
+- ✅ **The skill** — signal derivation + interpretation prompt, packaged as an installable
+  [Claude Code skill](skills/coaching-interpretation/) (intervals.icu ingestion + Obsidian
+  vault memory, wired end to end)
+- ✅ **The eval harness**, wired end-to-end — [`evals/`](evals/)
 
 Nothing here claims to do more than those checkboxes. That's deliberate.
 
@@ -39,7 +42,7 @@ After that, every prompt change is a measured delta, not a vibe. → [`evals/`](
 signal, don't quote it. "You spent 38% in Z5, pacing consistency 0.78" isn't coaching,
 it's a data dump — and it's what most tools produce. The forbidden vocabulary is enforced
 twice: in the prompt, and by a regex on the model's *output*
-([`coach_voice.py`](coach_voice.py)), in one file so the rule and its checker can't drift
+([`coach_voice.py`](skills/coaching-interpretation/scripts/coach_voice.py)), in one file so the rule and its checker can't drift
 apart. A prompt can *ask* for clean prose; this *proves* it.
 
 **Use the model only where you have to.** Whether a session hit its target, whether it was
@@ -69,11 +72,27 @@ Both are true. Only one tells you what happened and what to do. Full walk-throug
 ## Run the part that runs
 
 ```bash
-python3 coach_voice.py
+python3 skills/coaching-interpretation/scripts/coach_voice.py
 ```
 
 Scans a deliberately messy analyst brief and a clean coach brief, and prints exactly which
 rule each one trips. No install, standard library only.
+
+## Install it as a skill
+
+The interpretation engine is packaged as a self-contained
+[Claude Code skill](skills/coaching-interpretation/). Install it (symlink by default), set
+your intervals.icu credentials, and ask Claude about your training:
+
+```bash
+./install.sh                                  # links it into ~/.claude/skills/
+export INTERVALS_ATHLETE_ID=i12345
+export INTERVALS_API_KEY=...                  # Settings → Developer on intervals.icu
+```
+
+Then, in Claude Code: *"how did my last run go?"* — or run it directly with
+`python3 skills/coaching-interpretation/scripts/coach.py --vault ~/ObsidianVault`. It needs
+the `claude` CLI on your PATH and Python 3; no other dependencies.
 
 ## License
 

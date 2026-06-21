@@ -41,9 +41,10 @@ from derive_signals import derive_signals
 
 # ── The coaching framework (single source of truth, read from its reference file) ─────
 
+# scripts/interpret.py → up to the skill root → references/. Kept relative to this file so
+# the skill folder is portable (copy it anywhere and the framework still resolves).
 _FRAMEWORK_PATH = (
-    Path(__file__).parent
-    / "skills" / "coaching-interpretation" / "references" / "coaching_framework.md"
+    Path(__file__).resolve().parent.parent / "references" / "coaching_framework.md"
 )
 
 

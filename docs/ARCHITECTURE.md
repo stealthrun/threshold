@@ -46,10 +46,10 @@ comes from or where context is stored.
 
 The part that exists today and stays exactly as it is.
 
-- **Owns:** the deterministic signals ([`derive_signals.py`](../derive_signals.py)), the
-  interpretation step ([`interpret.py`](../interpret.py)), the athlete model
+- **Owns:** the deterministic signals ([`derive_signals.py`](../skills/coaching-interpretation/scripts/derive_signals.py)), the
+  interpretation step ([`interpret.py`](../skills/coaching-interpretation/scripts/interpret.py)), the athlete model
   ([`coaching_framework.md`](../skills/coaching-interpretation/references/coaching_framework.md)),
-  the voice contract + guard ([`coach_voice.py`](../coach_voice.py)), and the quality gate
+  the voice contract + guard ([`coach_voice.py`](../skills/coaching-interpretation/scripts/coach_voice.py)), and the quality gate
   ([`evals/`](../evals/)).
 - **Contract:** context in, read out. `interpret(session, recent_weeks)` is a pure
   function of its inputs — it makes one model call to write the prose, but it fetches

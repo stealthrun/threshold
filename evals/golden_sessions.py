@@ -270,7 +270,8 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent
+                           / "skills" / "coaching-interpretation" / "scripts"))
     from derive_signals import derive_signals
 
     for g in GOLDENS:
