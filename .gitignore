@@ -14,6 +14,11 @@ evals/results/*
 # Secrets / env — never commit
 .env
 .env.*
+# A real config holds the API key in plaintext; it lives in ~/.config, but guard the repo
+# in case one is created here. The committed template is config.example.toml.
+config.toml
+config.json
+!config.example.toml
 
 # OS / editor
 .DS_Store

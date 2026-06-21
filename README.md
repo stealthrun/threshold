@@ -81,18 +81,18 @@ rule each one trips. No install, standard library only.
 ## Install it as a skill
 
 The interpretation engine is packaged as a self-contained
-[Claude Code skill](skills/coaching-interpretation/). Install it (symlink by default), set
-your intervals.icu credentials, and ask Claude about your training:
+[Claude Code skill](skills/coaching-interpretation/). Install it (symlink by default), fill
+in your config, and ask Claude about your training:
 
 ```bash
-./install.sh                                  # links it into ~/.claude/skills/
-export INTERVALS_ATHLETE_ID=i12345
-export INTERVALS_API_KEY=...                  # Settings → Developer on intervals.icu
+./install.sh                                  # links into ~/.claude/skills/ + scaffolds config
+$EDITOR ~/.config/threshold/config.toml       # athlete_id, api_key, vault path
 ```
 
 Then, in Claude Code: *"how did my last run go?"* — or run it directly with
-`python3 skills/coaching-interpretation/scripts/coach.py --vault ~/ObsidianVault`. It needs
-the `claude` CLI on your PATH and Python 3; no other dependencies.
+`python3 skills/coaching-interpretation/scripts/coach.py`. It needs the `claude` CLI on your
+PATH and Python 3; no other dependencies. (`./install.sh --uninstall` removes it; your config
+and vault are left untouched.)
 
 ## License
 

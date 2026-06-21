@@ -1,0 +1,17 @@
+# threshold config — copy to ~/.config/threshold/config.toml and fill in.
+# This file holds your API key in plaintext: keep it private (chmod 600), never commit it.
+# Environment variables (INTERVALS_ATHLETE_ID / INTERVALS_API_KEY) override these if set.
+
+athlete_id = "i12345"          # your intervals.icu athlete id
+api_key = "your_api_key_here"  # intervals.icu → Settings → Developer
+vault = "~/threshold-vault"    # any folder Obsidian opens (can be empty)
+
+# Optional: your current training block. Pass --block-* on the command line to override.
+# The block is the deepest context tier — it flips how a session reads (expected build
+# fatigue vs. a taper-week flag), so keep it current.
+# [block]
+# name = "base build"
+# phase = "build"              # base / build / sharpening / taper
+# week = 6
+# total_weeks = 8
+# focus = "raising weekly volume and aerobic durability"
