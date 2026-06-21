@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from config import load_config, resolve_credentials
 from ingest.intervals_icu import Credentials, IntervalsError, load_session_detail
 from ingest.intervals_plan import fetch_recent_with_plan
 from interpret import interpret
@@ -99,7 +100,9 @@ def _build_arg_parser():
 
     p = argparse.ArgumentParser(
         description="Interpret one intervals.icu run as a coach and save it to the vault.")
-    p.add_argument("--vault", required=True, help="path to the Obsidian vault")
+    p.add_argument("--config", help="path to a config file (default: $THRESHOLD_CONFIG or "
+                                    "~/.config/threshold/config.toml)")
+    p.add_argument("--vault", help="path to the Obsidian vault (overrides the config file)")
     p.add_argument("--weeks", type=int, default=4, help="weeks of context to fetch (default 4)")
     sel = p.add_mutually_exclusive_group()
     sel.add_argument("--activity", help="intervals.icu activity id to read (e.g. i123)")
@@ -112,21 +115,36 @@ def _build_arg_parser():
     return p
 
 
+def _resolve_block(args, config: dict) -> dict | None:
+    """The block from CLI flags if any were given, else the one in the config file. CLI wins
+    as a whole (a partial --block-* set isn't merged with the file)."""
+    cli = _block_from_args(args.block_name, args.block_phase, args.block_week,
+                           args.block_total_weeks, args.block_focus)
+    if cli:
+        return cli
+    block = config.get("block")
+    return block or None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
 
     try:
-        creds = Credentials.from_env()
+        config = load_config(args.config)
+        creds = resolve_credentials(config)
     except IntervalsError as exc:
         print(f"  {exc}")
-        print("  Set INTERVALS_ATHLETE_ID and INTERVALS_API_KEY, then re-run.")
         return 2
 
-    block = _block_from_args(args.block_name, args.block_phase, args.block_week,
-                             args.block_total_weeks, args.block_focus)
+    vault = args.vault or config.get("vault")
+    if not vault:
+        print("  no vault path — pass --vault or set 'vault' in your config file.")
+        return 2
+
+    block = _resolve_block(args, config)
 
     try:
-        report = coach_session(creds, args.vault, weeks=args.weeks,
+        report = coach_session(creds, vault, weeks=args.weeks,
                                activity_id=args.activity, date=args.date, block=block)
     except IntervalsError as exc:
         print(f"  fetch failed: {exc}")

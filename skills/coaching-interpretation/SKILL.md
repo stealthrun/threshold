@@ -22,23 +22,27 @@ Obsidian vault, so coaching compounds over time.
 - **Python 3** (standard library only — nothing to `pip install`).
 - **The `claude` CLI** on `PATH` — the read is generated through it. Any Claude Code user
   already has it.
-- **intervals.icu credentials** in the environment (the API key is a secret; it is read only
-  from the environment, never logged or written to the vault):
+- **Config** — credentials + vault path, read from `~/.config/threshold/config.toml`
+  (`install.sh` scaffolds it from [`config.example.toml`](config.example.toml)):
 
-      export INTERVALS_ATHLETE_ID=i12345
-      export INTERVALS_API_KEY=...        # Settings → Developer on intervals.icu
+      athlete_id = "i12345"          # intervals.icu → Settings → Developer
+      api_key = "your_api_key"       # secret: chmod 600 the file; never committed/logged
+      vault = "~/threshold-vault"    # any folder Obsidian opens (can be empty)
 
-- **A vault path** — any folder Obsidian opens (it can be empty). The skill creates a
-  `threshold/` namespace inside it on first run, non-destructively.
+  Environment variables `INTERVALS_ATHLETE_ID` / `INTERVALS_API_KEY` override the file when
+  set (handy for a one-off run). The vault gets a `threshold/` namespace on first run,
+  created non-destructively. The API key is read only from the config or the environment —
+  never logged, never written to the vault.
 
 ## How to run it
 
 All paths are relative to this skill's folder; the entry point is
-[`scripts/coach.py`](scripts/coach.py):
+[`scripts/coach.py`](scripts/coach.py). With the config file in place it needs no arguments:
 
-    python3 scripts/coach.py --vault ~/ObsidianVault                  # most recent run
-    python3 scripts/coach.py --vault ~/ObsidianVault --activity i123  # a specific activity
-    python3 scripts/coach.py --vault ~/ObsidianVault --date 2026-06-18
+    python3 scripts/coach.py                       # most recent run, vault from config
+    python3 scripts/coach.py --activity i123       # a specific activity
+    python3 scripts/coach.py --date 2026-06-18
+    python3 scripts/coach.py --vault ~/other-vault # override the configured vault
 
 **Pass the block when the athlete tells you about it.** The training block is the deepest
 context tier and the one thing that can't be fetched — it's human-curated intent (what the
@@ -46,13 +50,14 @@ plan is *trying* to do right now), and it flips how an identical session reads: 
 under-target effort deep in a heavy build is expected fatigue; the same miss in a taper is a
 flag. Ask the athlete where they are, then thread it through:
 
-    python3 scripts/coach.py --vault ~/ObsidianVault \
+    python3 scripts/coach.py \
         --block-name "base build" --block-phase build \
         --block-week 6 --block-total-weeks 8 \
         --block-focus "raising weekly volume and aerobic durability"
 
-Once curated, the block also lives in the vault under `threshold/blocks/` — read it there to
-recall it on later runs.
+A stable block can instead live in the config file under `[block]`; the `--block-*` flags
+override it. Once curated, the block also appears in the vault under `threshold/blocks/` —
+read it there to recall it on later runs.
 
 ## What happens, end to end
 
@@ -98,11 +103,14 @@ manufactured concern.
 
 ## Installing this skill
 
-This folder is self-contained. To make it available in Claude Code, place it (or a symlink
-to it) in your personal skills directory:
+This folder is self-contained. From the repo, `install.sh` symlinks it into your personal
+skills directory and scaffolds the config file:
 
-    ln -s "$PWD/skills/coaching-interpretation" ~/.claude/skills/coaching-interpretation
+    ./install.sh                # install (symlink) + create ~/.config/threshold/config.toml
+    ./install.sh --copy         # install a standalone copy instead of a symlink
+    ./install.sh --uninstall    # remove the skill (config and vault left untouched)
 
-The repo's `install.sh` does this for you and prints the env-var setup. Quality is held to
-the source repo's `evals/` golden set (runner + LLM judge); those tests aren't shipped with
-the installed skill.
+(The bare symlink, if you prefer to do it by hand:
+`ln -s "$PWD/skills/coaching-interpretation" ~/.claude/skills/coaching-interpretation`.)
+Quality is held to the source repo's `evals/` golden set (runner + LLM judge); those tests
+aren't shipped with the installed skill.
