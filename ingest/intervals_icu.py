@@ -155,6 +155,7 @@ def activity_to_session(raw: dict, plan_targets: dict | None = None) -> dict:
         "name": raw.get("name"),
         "activity_type": _classify_run(zone_dist, dist_km),
         "distance_km": dist_km,
+        "duration_sec": moving or None,
         "avg_pace_sec_per_km": avg_pace,
         "avg_hr": raw.get("average_heartrate"),
         "max_hr": raw.get("max_heartrate"),
@@ -212,6 +213,64 @@ def fetch_recent(creds: Credentials, weeks: int = 4,
     sessions = [activity_to_session(a) for a in raw if _is_run(a)]
     sessions.sort(key=lambda s: s.get("date") or "", reverse=True)
     return sessions, summarise_weeks(sessions, weeks=weeks, today=today)
+
+
+# ── Per-rep laps: the work splits a quality read is built on ───────────────────────────
+#
+# The basic activities response is a summary — no splits. The per-activity intervals
+# endpoint carries them, so fetching laps is a second, on-demand call (you don't want one
+# per run when summarising weeks; you want it for the session being read closely).
+#
+# intervals.icu labels each interval WORK / RECOVERY / WARMUP / COOLDOWN — faithful here,
+# so derive_signals can count work reps and read the fade. Caveat: on an auto-detected
+# (unstructured) run intervals.icu marks every segment WORK; the typing is meaningful for
+# structured / planned sessions, which are the ones a quality read cares about.
+
+def _pace_from_speed(speed: float | None) -> int | None:
+    """m/s → seconds/km."""
+    return round(1000 / speed) if speed else None
+
+
+def interval_to_lap(iv: dict) -> dict:
+    """One intervals.icu interval → the lap shape derive_signals reads."""
+    return {
+        "lap_type": (iv.get("type") or "work").lower(),
+        "distance_m": round(iv["distance"]) if iv.get("distance") else None,
+        "duration_sec": iv.get("moving_time") or iv.get("elapsed_time"),
+        "avg_hr": iv.get("average_heartrate"),
+        "max_hr": iv.get("max_heartrate"),
+        "avg_pace_sec_per_km": _pace_from_speed(iv.get("average_speed")),
+        "zone": iv.get("zone"),
+    }
+
+
+def intervals_to_laps(raw: dict) -> list[dict]:
+    """Map an /activity/{id}/intervals response to a list of laps."""
+    return [interval_to_lap(iv) for iv in (raw.get("icu_intervals") or [])]
+
+
+def fetch_activity_intervals(creds: Credentials, activity_id: str) -> dict:
+    """Raw intervals (laps) for one activity."""
+    return _get(f"/activity/{activity_id}/intervals", {}, creds) or {}
+
+
+def attach_laps(creds: Credentials, session: dict) -> dict:
+    """Fetch and attach the per-rep laps for one mapped session (by its source_id).
+    Mutates and returns the session."""
+    sid = session.get("source_id")
+    if sid:
+        session["laps"] = intervals_to_laps(fetch_activity_intervals(creds, sid))
+    return session
+
+
+def load_session_detail(creds: Credentials, session: dict) -> dict:
+    """Everything the close read of one session needs: its laps, then the derived
+    metrics (pacing consistency, decoupling) computed from them and folded back in so
+    derive_signals picks them up. The one call the skill makes for the focal session."""
+    from ingest.metrics import enrich_session  # local import: metrics is the consumer
+
+    attach_laps(creds, session)
+    return enrich_session(session)
 
 
 # ── demo (network-gated) ──────────────────────────────────────────────────────────────
