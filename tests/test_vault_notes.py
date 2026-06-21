@@ -124,6 +124,30 @@ def test_find_similar_matches_same_type_only(vault):
     assert all("easy" not in name for name in similar)  # easy never matched
 
 
+def test_note_renders_a_splits_table(vault):
+    path = notes.record_session(vault, VO2, READ)
+    text = path.read_text(encoding="utf-8")
+    assert "## Splits" in text
+    assert "| # | type | dist | pace | HR | zone |" in text
+    assert "| 1 | work |" in text            # first work lap rendered
+    assert text.count("| work |") == 6       # all six work laps appear
+
+
+def test_note_without_laps_has_no_splits(vault):
+    no_laps = {"source_id": "i500", "date": "2026-06-15", "activity_type": "easy",
+               "distance_km": 8.0, "avg_pace_sec_per_km": 300, "avg_hr": 140}
+    text = notes.record_session(vault, no_laps, READ).read_text(encoding="utf-8")
+    assert "## Splits" not in text
+
+
+def test_is_recorded_tracks_written_notes(vault):
+    assert notes.is_recorded(vault, VO2) is False
+    notes.record_session(vault, VO2, READ)
+    assert notes.is_recorded(vault, VO2) is True
+    other = {**VO2, "source_id": "i999", "date": "2026-07-01"}
+    assert notes.is_recorded(vault, other) is False
+
+
 def test_find_similar_links_into_the_note(vault):
     notes.record_session(vault, {**VO2, "source_id": "i100", "date": "2026-05-20"},
                          "old vo2")

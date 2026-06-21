@@ -94,9 +94,9 @@ def test_pipeline_reads_most_recent_and_records(wired):
     # detail is loaded BEFORE interpret sees it (laps present on the interpreted session)
     assert wired["interpreted"]["session"]["laps"] == [{"lap_type": "work"}]
     assert wired["interpreted"]["recent"] == RECENT
-    assert wired["interpreted"]["block"] == block            # block threaded through
+    assert wired["interpreted"]["block"] == block            # full dict reaches interpret()
     assert wired["recorded"]["read"] == "Your read."
-    assert wired["recorded"]["block"] == block               # and into the vault note
+    assert wired["recorded"]["block"] == "base build"        # vault note links the block by name
     assert report["read"] == "Your read."
     assert report["note_path"] == "/vault/threshold/activities/note.md"
 
@@ -121,3 +121,47 @@ def test_unavailable_model_does_not_record(wired, monkeypatch):
     assert report["session"]["source_id"] == "i200"          # session was still fetched
     assert report["read"] is None and report["note_path"] is None
     assert "recorded" not in wired                           # nothing written without a read
+
+
+# ── bulk / sync (coach_all) ──────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def bulk_wired(monkeypatch):
+    """Stub the seams for coach_all and capture what gets recorded (a list, since bulk records
+    more than one)."""
+    recorded = []
+    monkeypatch.setattr(coach, "bootstrap_vault", lambda v: None)
+    monkeypatch.setattr(coach, "fetch_recent_with_plan", lambda c, weeks=4: (SESSIONS, RECENT))
+    monkeypatch.setattr(coach, "load_session_detail", lambda c, s: s)
+    monkeypatch.setattr(coach, "interpret", lambda s, r, b: f"read for {s['source_id']}")
+    monkeypatch.setattr(coach, "record_session",
+                        lambda v, s, read, block: recorded.append((s["source_id"], block)))
+    return recorded
+
+
+def test_all_records_new_and_skips_existing(bulk_wired, monkeypatch):
+    monkeypatch.setattr(coach, "is_recorded", lambda v, s: s["source_id"] == "i199")  # i199 done
+    res = coach.coach_all(CREDS, "/vault", block={"name": "base build"})
+    assert res["recorded"] == ["i200"] and res["skipped"] == ["i199"]
+    assert [sid for sid, _ in bulk_wired] == ["i200"]
+    assert bulk_wired[0][1] == "base build"                   # block passed by name, not dict
+
+
+def test_all_processes_oldest_first(bulk_wired, monkeypatch):
+    monkeypatch.setattr(coach, "is_recorded", lambda v, s: False)
+    res = coach.coach_all(CREDS, "/vault")
+    assert res["recorded"] == ["i199", "i200"]               # oldest (i199) before newest (i200)
+
+
+def test_all_force_rereads_recorded(bulk_wired, monkeypatch):
+    monkeypatch.setattr(coach, "is_recorded", lambda v, s: True)   # everything already recorded
+    res = coach.coach_all(CREDS, "/vault", force=True)
+    assert set(res["recorded"]) == {"i199", "i200"} and res["skipped"] == []
+
+
+def test_all_tracks_sessions_with_no_read(bulk_wired, monkeypatch):
+    monkeypatch.setattr(coach, "is_recorded", lambda v, s: False)
+    monkeypatch.setattr(coach, "interpret", lambda s, r, b: None)  # model unavailable
+    res = coach.coach_all(CREDS, "/vault")
+    assert set(res["no_read"]) == {"i199", "i200"} and res["recorded"] == []
+    assert bulk_wired == []                                   # nothing recorded without a read

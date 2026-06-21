@@ -161,6 +161,32 @@ def _details_block(session: dict, signals: dict) -> str:
     return "## Details\n```json\n" + json.dumps(detail, indent=2) + "\n```\n"
 
 
+def _fmt_pace(sec_per_km) -> str:
+    if not sec_per_km:
+        return "—"
+    m, s = divmod(int(sec_per_km), 60)
+    return f"{m}:{s:02d}/km"
+
+
+def _splits_block(laps: list[dict] | None) -> str:
+    """A per-lap table (pace / HR / zone) so the splits the read is built on are visible in
+    the note, not just folded into signals. Empty string when there are no laps."""
+    rows = [l for l in (laps or []) if l.get("avg_pace_sec_per_km") or l.get("avg_hr")]
+    if not rows:
+        return ""
+    out = ["## Splits", "", "| # | type | dist | pace | HR | zone |",
+           "|--:|------|-----:|------|---:|---:|"]
+    for i, l in enumerate(rows, 1):
+        dist = f"{l['distance_m'] / 1000:.2f}km" if l.get("distance_m") else "—"
+        zone = l.get("zone")
+        out.append(
+            f"| {i} | {l.get('lap_type', '')} | {dist} | "
+            f"{_fmt_pace(l.get('avg_pace_sec_per_km'))} | {l.get('avg_hr') or '—'} | "
+            f"{zone if zone is not None else '—'} |"
+        )
+    return "\n".join(out) + "\n"
+
+
 def _links_block(week: str | None, block: str | None, type_name: str | None,
                  similar: list[str]) -> str:
     lines = ["## Links"]
@@ -185,12 +211,14 @@ def render_activity_note(session: dict, read: str, *, week: str | None,
         "<!-- Your own observations. threshold never overwrites this section. -->"
     )
     title = f"{session.get('date', '')} — {session.get('activity_type', 'session')}".strip(" —")
+    splits = _splits_block(session.get("laps"))
     return (
         f"{_frontmatter(session, signals)}\n"
         f"# {title}\n\n"
         f"> {signals.get('key_signal', '')}\n\n"
         f"{read.strip()}\n\n"
         f"{_details_block(session, signals)}\n"
+        f"{splits + chr(10) if splits else ''}"
         f"{_links_block(week, block, session.get('activity_type'), similar)}\n"
         f"## Notes\n{notes}\n"
     )
@@ -257,3 +285,10 @@ def record_session(vault_path: str | Path, session: dict, read: str,
         _write_block_stub(root / "blocks", block)
 
     return note_path
+
+
+def is_recorded(vault_path: str | Path, session: dict) -> bool:
+    """True if this session already has an activity note (by its stable name). Lets a bulk
+    sync skip sessions already read instead of re-spending a model call on them."""
+    activities = Path(vault_path).expanduser() / NAMESPACE / "activities"
+    return (activities / f"{activity_basename(session)}.md").is_file()

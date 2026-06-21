@@ -31,7 +31,7 @@ from ingest.intervals_icu import Credentials, IntervalsError, load_session_detai
 from ingest.intervals_plan import fetch_recent_with_plan
 from interpret import interpret
 from vault.bootstrap import bootstrap_vault
-from vault.notes import record_session
+from vault.notes import is_recorded, record_session
 
 
 # ── Selecting the focal session ────────────────────────────────────────────────────────
@@ -88,9 +88,39 @@ def coach_session(creds: Credentials, vault_path: str | Path, *, weeks: int = 4,
         return {"read": None, "note_path": None, "session": focal,
                 "recent_weeks": recent_weeks}
 
-    note_path = record_session(vault_path, focal, read, block)
+    # interpret() takes the full block dict; the vault note only links the block by name
+    # (its phase/focus/weeks live in the curated block note).
+    note_path = record_session(vault_path, focal, read, block.get("name") if block else None)
     return {"read": read, "note_path": note_path, "session": focal,
             "recent_weeks": recent_weeks}
+
+
+def coach_all(creds: Credentials, vault_path: str | Path, *, weeks: int = 4,
+              block: dict | None = None, force: bool = False) -> dict:
+    """Read + record every run in the window (bulk / sync). By default skips sessions already
+    recorded in the vault, so re-running only spends model calls on new ones; `force` re-reads
+    everything. Processes oldest-first so notes accrue in order.
+
+    Returns {"recorded": [...], "skipped": [...], "no_read": [...]} of source ids.
+    """
+    bootstrap_vault(vault_path)
+    sessions, recent_weeks = fetch_recent_with_plan(creds, weeks=weeks)
+    block_name = block.get("name") if block else None
+    out: dict[str, list] = {"recorded": [], "skipped": [], "no_read": []}
+
+    for s in reversed(sessions):                       # oldest first
+        sid = s.get("source_id")
+        if not force and is_recorded(vault_path, s):
+            out["skipped"].append(sid)
+            continue
+        load_session_detail(creds, s)
+        read = interpret(s, recent_weeks, block)
+        if not read:
+            out["no_read"].append(sid)
+            continue
+        record_session(vault_path, s, read, block_name)
+        out["recorded"].append(sid)
+    return out
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────────────
@@ -106,6 +136,10 @@ def _build_arg_parser():
     p.add_argument("--weeks", type=int, default=4, help="weeks of context to fetch (default 4)")
     p.add_argument("--list", action="store_true",
                    help="just fetch and print recent runs — no read, no vault write, no model")
+    p.add_argument("--all", action="store_true", dest="all_runs",
+                   help="read + record every run in the window (skips ones already in the vault)")
+    p.add_argument("--force", action="store_true",
+                   help="with --all, re-read runs that are already recorded")
     sel = p.add_mutually_exclusive_group()
     sel.add_argument("--activity", help="intervals.icu activity id to read (e.g. i123)")
     sel.add_argument("--date", help="read the run on this date (YYYY-MM-DD)")
@@ -182,6 +216,18 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     block = _resolve_block(args, config)
+
+    if args.all_runs:
+        try:
+            res = coach_all(creds, vault, weeks=args.weeks, block=block, force=args.force)
+        except IntervalsError as exc:
+            print(f"  fetch failed: {exc}")
+            return 1
+        print(f"  recorded {len(res['recorded'])}, skipped {len(res['skipped'])} "
+              f"(already in vault), no read for {len(res['no_read'])}.")
+        if res["recorded"]:
+            print("  new: " + ", ".join(res["recorded"]))
+        return 0
 
     try:
         report = coach_session(creds, vault, weeks=args.weeks,

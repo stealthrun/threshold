@@ -50,9 +50,13 @@ your job is to pick the command and relay its output.
 | "how did my last run go?" | `python3 scripts/coach.py` |
 | "read my run from Tuesday / the 18th" | `python3 scripts/coach.py --date 2026-06-18` |
 | "how was *that* session" (you have an id) | `python3 scripts/coach.py --activity i123` |
+| "read / sync my whole week" | `python3 scripts/coach.py --all` |
 
 `--list` is cheap (fetch + print only, no model call, no vault write) — use it to find the
-activity id, then read a specific one with `--activity`. All paths are relative to this
+activity id, then read a specific one with `--activity`. `--all` reads and records *every*
+run in the window, skipping those already in the vault (so it's a re-runnable sync that only
+spends a model call per *new* run; add `--force` to redo existing ones). Each recorded note
+includes a `## Splits` table of the per-lap pace/HR/zone. All paths are relative to this
 skill's folder; with the config file in place the entry point needs no other arguments.
 
 **Pass the block when the athlete tells you about it.** The training block is the deepest
