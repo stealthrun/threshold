@@ -50,7 +50,7 @@ Once the goldens exist, every prompt change is a measured delta, not a vibe.
 Quality here has two independent failure surfaces, so it gets two independent checks.
 
 **Layer 1 — the voice guard (deterministic).** A regex over the model's *output*
-([`coach_voice.py`](../coach_voice.py)). It can only see surface leaks — a stray `Z5`, a
+([`coach_voice.py`](../skills/coaching-interpretation/scripts/coach_voice.py)). It can only see surface leaks — a stray `Z5`, a
 `0.78`, a bare `VO2`, an em dash — but those are exactly the failures that used to ship.
 It's free, instant, and it's the half a prompt fundamentally cannot guarantee: a prompt
 can *ask* for clean prose; it cannot *prove* the prose is clean.
@@ -89,7 +89,7 @@ architecture over the impressive-looking one.
 ## 6. One voice, one place
 
 The voice contract and its checker live in the same module
-([`coach_voice.py`](../coach_voice.py)). This is not incidental. Earlier, the same
+([`coach_voice.py`](../skills/coaching-interpretation/scripts/coach_voice.py)). This is not incidental. Earlier, the same
 guardrail was copy-pasted — slightly differently — into four prompt sites, and that drift
 is what let the athlete-facing surfaces diverge. The rule (`VOICE_GUARDRAILS`, prose for
 the model) and its enforcement (`voice_violations`, regex on the output) now move

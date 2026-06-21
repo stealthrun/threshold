@@ -25,7 +25,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root on path
+_REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO))                                   # repo root: the evals package
+sys.path.insert(0, str(_REPO / "skills" / "coaching-interpretation" / "scripts"))  # the core
 
 from coach_voice import voice_violations  # noqa: E402
 from evals import judge as judge_mod  # noqa: E402

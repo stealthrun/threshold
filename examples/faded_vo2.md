@@ -36,7 +36,7 @@ distinction is the entire point.
 > 6. Average HR 170, pacing consistency 0.71."
 
 Every word true. None of it tells the athlete what happened or what to do. It also leaks
-exactly the things the [voice guard](../coach_voice.py) forbids — `Z5`, `38%`, `0.71`,
+exactly the things the [voice guard](../skills/coaching-interpretation/scripts/coach_voice.py) forbids — `Z5`, `38%`, `0.71`,
 `decoupled`.
 
 > **Coach (what `threshold` targets):**
