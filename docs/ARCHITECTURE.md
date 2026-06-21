@@ -95,13 +95,61 @@ not something measurable from activity data. The athlete tells the agent ("I'm i
 competition block, week 5 of 8"), it's written to the vault, and from then on every read
 is interpreted against it.
 
-### The vault contract (memory)
+### The vault as memory
 
-One rule, carried over from the private lab: **the agent owns the structured part, the
-human owns the prose.** The skill may create and update the machine-readable fields and the
-generated read; it must **never** overwrite the athlete's own free-text notes. Writes are
-**idempotent** — re-running "read my last 4 weeks" must not duplicate notes or clobber
-hand-written observations.
+The vault is not "a folder of notes" — it is the **retrieval layer**, and its structure is
+what makes context assembly cheap. Two properties matter: the skill must be able to
+**bootstrap it from nothing**, and the **wikilink graph is the index** the agent navigates
+by.
+
+**Bootstrap (the empty / messy vault).** The skill must assume the athlete has zero files
+and zero structure — or, worse, an *existing personal vault* it must not trample. So
+bootstrap is:
+
+- **idempotent** — run it twice, no harm; it creates only what is missing;
+- **non-invasive** — everything lives under a `threshold/` namespace inside the vault,
+  never dumped into the root of someone's existing notes;
+- **self-scaffolding** — it lays down the skeleton plus seed hub notes, so the graph always
+  has anchors to link into:
+
+```
+<vault>/threshold/
+├── activities/   # one note per session
+├── weeks/        # weekly rollups
+├── blocks/       # periodization nodes (human-curated)
+├── types/        # session-type hubs: easy, tempo, threshold, vo2, long, jog
+└── profile.md    # the athlete model, seeded from coaching_framework.md
+```
+
+The `types/` hubs and `profile.md` exist *so there is always something to link to* — even an
+empty vault has a skeleton the first activity note can wire into.
+
+**The link graph is the index.** A coach needs to answer "how does today compare to past
+threshold sessions?" and "where am I in the block?" Instead of a vector DB or SQL, the
+**backlinks answer those by traversal** — the agent walks the graph rather than scanning
+every file, and the graph stays human-readable (Obsidian opens it). Every note carries a
+`## Links` section, and each link earns its place by enabling one traversal the read needs:
+
+| note | links to | the question it answers |
+|---|---|---|
+| **activity** | its **week** | what was the load around this session? |
+| | its **block** | where in the plan does this sit? |
+| | its **type hub** (`types/threshold`) | how does it compare to past threshold work? |
+| | **similar sessions** | have I done this exact thing before? |
+| **week** | its **block** | which mesocycle is this week part of? |
+| **block** | its **weeks** | how is the block progressing? |
+| **type hub** | (backlinked from every session of that type) | show me all my VO2 sessions — for free |
+
+So interpreting today's run becomes a **graph walk, not a glob**: open today's note → follow
+the **block** link (build vs. taper) → the **week** link (recent load) → the **type hub**
+(similar past sessions) → hand all of it to the core → write the read back, which auto-links
+into the same graph and is now context for next time. That last edge is the compounding: a
+new read *adds a node and its links*, so the memory gets richer with every session.
+
+**The one rule, carried over from the private lab:** the agent owns the structured fields,
+the links, and the generated read; it **never** overwrites the athlete's own `## Notes`
+prose, and bootstrap **never** overwrites existing structure. Idempotent and
+non-destructive, always.
 
 ### Credentials (intervals.icu)
 
@@ -152,7 +200,8 @@ reasoning deterministic and gated.**
 
 - ✅ **Layer 1** — built: signals, interpretation, framework, voice guard, evals.
 - 🚧 **Layer 2** — next: block context in the core's contract, then intervals.icu fetch,
-  then the vault memory layer, then the `SKILL.md` orchestrator.
+  then the vault memory layer (bootstrap + the link graph), then the `SKILL.md`
+  orchestrator.
 - ⏳ **Layer 3** — later: Strava / Coros / Garmin MCP enrichment.
 
 The build order is deliberate: the contextual-coaching claim is proven *in the core first*
