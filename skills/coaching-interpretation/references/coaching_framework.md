@@ -61,6 +61,32 @@ happened*. This framework says *what it means for this athlete*. The mapping:
 | session cut on an Achilles niggle | the correct, protective call — affirm it, then guard the tendon |
 | hit the plan cleanly, body fine | say so plainly — **do not manufacture concern** |
 
+## Reading the session against the block
+
+The signals say what happened; the limiters say what it means for this athlete; the
+**block** says whether that meaning is good news or a problem *right now*. The same session
+is read differently depending on where the athlete is in the plan — this is the difference
+between coaching and describing.
+
+- **Base / build phase.** The job is accumulating volume and aerobic durability, and
+  fatigue is expected. An under-target quality session deep in a heavy build is the *cost of
+  the work*, not lost fitness — reassure, keep the durability work going, adjust recovery if
+  needed. A clean session here is durability being banked. Speed sharpness is not the point
+  yet, so don't fault a flat top end.
+
+- **Sharpening / competition phase.** Volume drops and quality should feel *sharp*. Now an
+  off session matters more: paces that should feel easy but don't, or a quality effort that
+  falls flat, is a real flag worth heeding, not something to push through.
+
+- **Taper / race week.** The job is shedding fatigue so the engine arrives fresh. Slightly
+  flat legs early in a taper are normal and expected; the read should reassure and protect.
+  But a session that still feels heavy *late* in a taper, or any Achilles signal this close
+  to a race, is a genuine concern — protect, don't chase. Never prescribe added load in a
+  taper to "make up" a miss.
+
+The throughline: an identical under-target effort is *expected fatigue* in a build and a
+*flag* in a taper. Read the block before deciding which.
+
 ## The discipline that ties it together
 
 This athlete is an engineer: curious, reads physiology, responds to the *why*. Explain the
